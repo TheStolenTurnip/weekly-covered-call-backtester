@@ -7,6 +7,7 @@ from scipy.stats import norm
 import math
 import yfinance as yf
 
+
 def black_scholes_call(S, K, T, r, sigma):
     """European call (Black-Scholes)"""
     if sigma <= 0 or T <= 0:
@@ -49,7 +50,7 @@ with col1:
     symbol = st.text_input("Ticker", value="BMNR").upper().strip()
 with col2:
     iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=100.0, step=5.0,
-                                 help="Implied volatility used to estimate call premiums") / 100.0
+                                 help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
 with col3:
     num_shares = st.number_input("Shares (1 lot)", min_value=100, value=100, step=100,
                                  help="Number of shares held / contracts written")
@@ -142,7 +143,7 @@ if symbol:
             margin=dict(l=40, r=40, t=60, b=40)
         )
 
-# Custom hover with $ and 2 decimals
+        # Custom hover with $ and 2 decimals
         price_fig.update_traces(
             hovertemplate='Date: %{x|%Y-%m-%d}<br>Close: $%{y:,.2f}<extra></extra>'
         )
@@ -161,8 +162,6 @@ if symbol:
     else:
         st.info("No price data available for this ticker.")
 
-with st.spinner("Loading stock data... (may take a moment on first load)"):
-    df = fetch_stock_data(symbol)
 
 # ── Backtest ──────────────────────────────────────────────────────────────
 if st.button("Run Weekly Backtest", type="primary"):
@@ -206,7 +205,8 @@ if st.button("Run Weekly Backtest", type="primary"):
                 'strike': None,
                 'premium_collected': 0.0,
                 'cumulative_premium': cumulative_premium,
-                'net_cash_change': 0.0,
+                'net_cash_inflows': 0.0,
+                'net_cash_outflows': 0.0,
                 'assigned': False,
                 'reentry_price': None,
                 'cost_basis_per_share': None,
@@ -230,13 +230,14 @@ if st.button("Run Weekly Backtest", type="primary"):
         cumulative_premium += premium_collected
 
         assigned = friday_close >= strike
-        net_cash_change = premium_collected
+        net_cash_inflows = premium_collected
+        net_cash_outflows = 0.0
         missed_upside = 0.0
         reentry_price = None
 
         if assigned:
             cash_from_assignment = strike * num_shares
-            net_cash_change += cash_from_assignment
+            net_cash_inflows += cash_from_assignment  # inflows only
 
             missed_upside = max(0, (friday_close - strike) * num_shares)
 
@@ -244,18 +245,21 @@ if st.button("Run Weekly Backtest", type="primary"):
             remaining_shares = 0
             cost_basis_per_share = None
 
+            # Flag for next week re-entry
             if reopen_if_assigned and i < len(df_weekly) - 1:
-                next_row = df_weekly.iloc[i + 1]
-                next_monday_open = next_row['open']
-                reentry_cost = next_monday_open * num_shares
-                reentry_price = next_monday_open
-
-                current_capital = reentry_cost
-                running_max_capital = max(running_max_capital, reentry_cost)
-                remaining_shares = num_shares
-                cost_basis_per_share = next_monday_open
+                reentry_price = None  # not used this week
             else:
                 holding_stock = False
+
+        # Re-entry week: outflow happens here (negative)
+        if i > 0 and strategy_results and strategy_results[-1]['assigned'] and reopen_if_assigned:
+            next_monday_open = monday_open
+            reentry_cost = next_monday_open * num_shares
+            net_cash_outflows = -reentry_cost  # negative outflow
+            remaining_shares = num_shares
+            cost_basis_per_share = next_monday_open
+            current_capital = reentry_cost
+            running_max_capital = max(running_max_capital, current_capital)
 
         running_max_capital = max(running_max_capital, current_capital)
 
@@ -266,7 +270,8 @@ if st.button("Run Weekly Backtest", type="primary"):
             'strike': strike,
             'premium_collected': premium_collected,
             'cumulative_premium': cumulative_premium,
-            'net_cash_change': net_cash_change,
+            'net_cash_inflows': net_cash_inflows,
+            'net_cash_outflows': net_cash_outflows,
             'assigned': assigned,
             'reentry_price': reentry_price,
             'cost_basis_per_share': cost_basis_per_share,
@@ -275,6 +280,13 @@ if st.button("Run Weekly Backtest", type="primary"):
         })
 
     df_strategy = pd.DataFrame(strategy_results)
+
+    # FIX: Replace None with 0.0 for safe formatting
+    df_strategy['net_cash_inflows'] = df_strategy['net_cash_inflows'].fillna(0.0)
+    df_strategy['net_cash_outflows'] = df_strategy['net_cash_outflows'].fillna(0.0)
+    df_strategy['reentry_price'] = df_strategy['reentry_price'].fillna(0.0)
+    df_strategy['cost_basis_per_share'] = df_strategy['cost_basis_per_share'].fillna(0.0)
+    df_strategy['missed_upside'] = df_strategy['missed_upside'].fillna(0.0)
 
     bh_start_date = df.index.min().strftime('%Y-%m-%d')
     bh_end_date = df.index.max().strftime('%Y-%m-%d')
@@ -327,7 +339,8 @@ if st.button("Run Weekly Backtest", type="primary"):
         df_strategy.style.format({
             'premium_collected': '${:,.2f}',
             'cumulative_premium': '${:,.2f}',
-            'net_cash_change': '${:,.2f}',
+            'net_cash_inflows': '${:,.2f}',
+            'net_cash_outflows': '${:,.2f}',
             'monday_open': '${:.2f}',
             'friday_close': '${:.2f}',
             'strike': '${:.2f}',
@@ -343,9 +356,16 @@ if st.button("Run Weekly Backtest", type="primary"):
             'strike': st.column_config.Column("Strike", help="Call strike sold (next $0.50 above open)"),
             'premium_collected': st.column_config.Column("Premium", help="Estimated cash from selling the call"),
             'cumulative_premium': st.column_config.Column("Cum. Premium", help="Running total of premiums"),
-            'net_cash_change': st.column_config.Column("Net Cash", help="Premium + assignment proceeds this week"),
+            'net_cash_outflows': st.column_config.Column(
+                "Net Cash Outflows",
+                help="Cash spent this week on re-entering position (if previous week was assigned and reopened) — negative value"
+            ),
+            'net_cash_inflows': st.column_config.Column(
+                "Net Cash Inflows",
+                help="Cash received this week: premium + assignment proceeds (if assigned) — positive value"
+            ),
             'assigned': st.column_config.Column("Assigned", help="Call was ITM or ATM and shares called away"),
-            'reentry_price': st.column_config.Column("Re-entry Price", help="Price paid to buy back next Monday (if reopened)"),
+            'reentry_price': st.column_config.Column("Re-entry Price", help="Price paid to buy back this week (if previous week assigned)"),
             'cost_basis_per_share': st.column_config.Column("Cost Basis/Share", help="Average cost per share of current position"),
             'missed_upside': st.column_config.Column("Missed Upside ($)", help="Extra gain given up on assigned weeks: (close - strike) × shares"),
             'Running Max Capital': st.column_config.Column(
@@ -421,6 +441,8 @@ if st.button("Run Weekly Backtest", type="primary"):
     - **Strategy PnL (%)** is dynamic vs the running max capital required at each week
     - Click + drag pans the chart; scroll wheel or box select to zoom
     - Hover shows exact $ and % values (rounded to 2 decimals)
+    - **Net Cash Inflows** = premium + assignment proceeds received this week (positive)
+    - **Net Cash Outflows** = re-entry cost paid this week (negative if occurred, $0 otherwise)
     """)
 
     # ── Disclaimer, Methodology & Credit ──────────────────────────────────────
