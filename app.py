@@ -50,7 +50,7 @@ with col1:
     symbol = st.text_input("Ticker", value="BMNR").upper().strip()
 with col2:
     iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=100.0, step=5.0,
-                                 help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
+                                 help="Implied volatility used to estimate call premiums") / 100.0
 with col3:
     num_shares = st.number_input("Shares (1 lot)", min_value=100, value=100, step=100,
                                  help="Number of shares held / contracts written")
@@ -143,7 +143,6 @@ if symbol:
             margin=dict(l=40, r=40, t=60, b=40)
         )
 
-        # Custom hover with $ and 2 decimals
         price_fig.update_traces(
             hovertemplate='Date: %{x|%Y-%m-%d}<br>Close: $%{y:,.2f}<extra></extra>'
         )
@@ -205,13 +204,13 @@ if st.button("Run Weekly Backtest", type="primary"):
                 'strike': None,
                 'premium_collected': 0.0,
                 'cumulative_premium': cumulative_premium,
-                'net_cash_inflows': 0.0,
-                'net_cash_outflows': 0.0,
+                'assignment_gain': 0.0,
                 'assigned': False,
                 'reentry_price': None,
                 'cost_basis_per_share': None,
                 'missed_upside': 0.0,
                 'Running Max Capital': running_max_capital,
+                'net_liq_value': 0.0,
             })
             continue
 
@@ -230,14 +229,12 @@ if st.button("Run Weekly Backtest", type="primary"):
         cumulative_premium += premium_collected
 
         assigned = friday_close >= strike
-        net_cash_inflows = premium_collected
-        net_cash_outflows = 0.0
+        assignment_gain = 0.0
         missed_upside = 0.0
         reentry_price = None
 
         if assigned:
-            cash_from_assignment = strike * num_shares
-            net_cash_inflows += cash_from_assignment  # inflows only
+            assignment_gain = (strike - monday_open) * num_shares
 
             missed_upside = max(0, (friday_close - strike) * num_shares)
 
@@ -245,23 +242,21 @@ if st.button("Run Weekly Backtest", type="primary"):
             remaining_shares = 0
             cost_basis_per_share = None
 
-            # Flag for next week re-entry
             if reopen_if_assigned and i < len(df_weekly) - 1:
-                reentry_price = None  # not used this week
+                next_row = df_weekly.iloc[i + 1]
+                next_monday_open = next_row['open']
+                reentry_price = next_monday_open
+                remaining_shares = num_shares
+                cost_basis_per_share = next_monday_open
+                current_capital = next_monday_open * num_shares
+                running_max_capital = max(running_max_capital, current_capital)
             else:
                 holding_stock = False
 
-        # Re-entry week: outflow happens here (negative)
-        if i > 0 and strategy_results and strategy_results[-1]['assigned'] and reopen_if_assigned:
-            next_monday_open = monday_open
-            reentry_cost = next_monday_open * num_shares
-            net_cash_outflows = -reentry_cost  # negative outflow
-            remaining_shares = num_shares
-            cost_basis_per_share = next_monday_open
-            current_capital = reentry_cost
-            running_max_capital = max(running_max_capital, current_capital)
-
         running_max_capital = max(running_max_capital, current_capital)
+
+        current_position_value = remaining_shares * friday_close
+        net_liq_value = cumulative_premium + current_position_value + assignment_gain
 
         strategy_results.append({
             'week': date.strftime('%Y-%m-%d'),
@@ -270,23 +265,23 @@ if st.button("Run Weekly Backtest", type="primary"):
             'strike': strike,
             'premium_collected': premium_collected,
             'cumulative_premium': cumulative_premium,
-            'net_cash_inflows': net_cash_inflows,
-            'net_cash_outflows': net_cash_outflows,
+            'assignment_gain': assignment_gain,
             'assigned': assigned,
             'reentry_price': reentry_price,
             'cost_basis_per_share': cost_basis_per_share,
             'missed_upside': missed_upside,
             'Running Max Capital': running_max_capital,
+            'net_liq_value': net_liq_value,
         })
 
     df_strategy = pd.DataFrame(strategy_results)
 
-    # FIX: Replace None with 0.0 for safe formatting
-    df_strategy['net_cash_inflows'] = df_strategy['net_cash_inflows'].fillna(0.0)
-    df_strategy['net_cash_outflows'] = df_strategy['net_cash_outflows'].fillna(0.0)
+    # Fill None with 0 for safe formatting
+    df_strategy['assignment_gain'] = df_strategy['assignment_gain'].fillna(0.0)
     df_strategy['reentry_price'] = df_strategy['reentry_price'].fillna(0.0)
     df_strategy['cost_basis_per_share'] = df_strategy['cost_basis_per_share'].fillna(0.0)
     df_strategy['missed_upside'] = df_strategy['missed_upside'].fillna(0.0)
+    df_strategy['net_liq_value'] = df_strategy['net_liq_value'].fillna(0.0)
 
     bh_start_date = df.index.min().strftime('%Y-%m-%d')
     bh_end_date = df.index.max().strftime('%Y-%m-%d')
@@ -304,8 +299,8 @@ if st.button("Run Weekly Backtest", type="primary"):
     total_pnl_pct_vs_max = (total_pnl_incl_premium / running_max_capital) * 100 if running_max_capital > 0 else 0.0
 
     # Net Liquidation Value = total premiums + final position value
-    bh_net_liq = bh_end_price * num_shares  # Buy & Hold: just final shares value
-    strategy_net_liq = total_premium + final_position_value  # Strategy: premiums + remaining position
+    bh_net_liq = bh_end_price * num_shares
+    strategy_net_liq = total_premium + final_position_value
 
     # ── Display ────────────────────────────────────────────────────────────
     st.subheader("Buy & Hold Summary")
@@ -339,8 +334,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         df_strategy.style.format({
             'premium_collected': '${:,.2f}',
             'cumulative_premium': '${:,.2f}',
-            'net_cash_inflows': '${:,.2f}',
-            'net_cash_outflows': '${:,.2f}',
+            'assignment_gain': '${:,.2f}',
             'monday_open': '${:.2f}',
             'friday_close': '${:.2f}',
             'strike': '${:.2f}',
@@ -348,6 +342,7 @@ if st.button("Run Weekly Backtest", type="primary"):
             'cost_basis_per_share': '${:.2f}',
             'missed_upside': '${:,.2f}',
             'Running Max Capital': '${:,.2f}',
+            'net_liq_value': '${:,.2f}',
         }),
         column_config={
             'week': st.column_config.Column("Week", help="Week ending date (Friday)"),
@@ -356,21 +351,21 @@ if st.button("Run Weekly Backtest", type="primary"):
             'strike': st.column_config.Column("Strike", help="Call strike sold (next $0.50 above open)"),
             'premium_collected': st.column_config.Column("Premium", help="Estimated cash from selling the call"),
             'cumulative_premium': st.column_config.Column("Cum. Premium", help="Running total of premiums"),
-            'net_cash_outflows': st.column_config.Column(
-                "Net Cash Outflows",
-                help="Cash spent this week on re-entering position (if previous week was assigned and reopened) — negative value"
-            ),
-            'net_cash_inflows': st.column_config.Column(
-                "Net Cash Inflows",
-                help="Cash received this week: premium + assignment proceeds (if assigned) — positive value"
+            'assignment_gain': st.column_config.Column(
+                "Assignment Gain",
+                help="Net profit from assignment this week (strike - open price) × shares — $0 if not assigned"
             ),
             'assigned': st.column_config.Column("Assigned", help="Call was ITM or ATM and shares called away"),
-            'reentry_price': st.column_config.Column("Re-entry Price", help="Price paid to buy back this week (if previous week assigned)"),
+            'reentry_price': st.column_config.Column("Re-entry Price", help="Price paid to buy back next week (if reopened)"),
             'cost_basis_per_share': st.column_config.Column("Cost Basis/Share", help="Average cost per share of current position"),
             'missed_upside': st.column_config.Column("Missed Upside ($)", help="Extra gain given up on assigned weeks: (close - strike) × shares"),
             'Running Max Capital': st.column_config.Column(
                 "Running Max Capital",
                 help="Highest capital tied up in shares so far (cumulative peak)"
+            ),
+            'net_liq_value': st.column_config.Column(
+                "Net Liquidation Value",
+                help="Total account value at end of week: shares value + cumulative premiums + assignment gain that week"
             ),
         }
     )
@@ -378,16 +373,18 @@ if st.button("Run Weekly Backtest", type="primary"):
     # ── PnL Chart ────────────────────────────────────────────────────────────
     st.subheader("PnL Comparison Over Time")
 
-    chart_df = df_strategy[['week', 'Running Max Capital']].copy()
+    chart_df = df_strategy[['week', 'Running Max Capital', 'cumulative_premium', 'cost_basis_per_share', 'friday_close']].copy()
 
-    chart_df['Buy & Hold PnL ($)'] = (df_strategy['friday_close'] - initial_price) * num_shares
-    chart_df['Buy & Hold PnL (%)'] = ((df_strategy['friday_close'] / initial_price) - 1) * 100
+    # Use last known remaining_shares for chart (since it's not in df_strategy anymore)
+    chart_df['remaining_shares'] = final_remaining_shares
+    chart_df['current_position_value'] = chart_df['remaining_shares'] * chart_df['friday_close']
+    chart_df['current_invested'] = chart_df['remaining_shares'] * chart_df['cost_basis_per_share'].fillna(0)
+    chart_df['Strategy PnL ($)'] = chart_df['cumulative_premium'] + chart_df['current_position_value'] - chart_df['current_invested']
 
-    chart_df['current_position_value'] = remaining_shares * df_strategy['friday_close']
-    chart_df['current_invested'] = remaining_shares * df_strategy['cost_basis_per_share'].fillna(0)
-    chart_df['Strategy PnL ($)'] = df_strategy['cumulative_premium'] + chart_df['current_position_value'] - chart_df['current_invested']
+    chart_df['Strategy PnL (%)'] = (chart_df['Strategy PnL ($)'] / chart_df['Running Max Capital']) * 100
 
-    chart_df['Strategy PnL (%)'] = (chart_df['Strategy PnL ($)'] / df_strategy['Running Max Capital']) * 100
+    chart_df['Buy & Hold PnL ($)'] = (chart_df['friday_close'] - initial_price) * num_shares
+    chart_df['Buy & Hold PnL (%)'] = ((chart_df['friday_close'] / initial_price) - 1) * 100
 
     chart_long_dollar = chart_df.melt(id_vars=['week'],
                                       value_vars=['Buy & Hold PnL ($)', 'Strategy PnL ($)'],
@@ -397,35 +394,94 @@ if st.button("Run Weekly Backtest", type="primary"):
                                    value_vars=['Buy & Hold PnL (%)', 'Strategy PnL (%)'],
                                    var_name='Metric', value_name='Value')
 
-    fig = px.line(chart_long_dollar, x='week', y='Value', color='Metric',
-                  title="PnL Comparison Over Time",
-                  labels={'week': 'Week Ending'},
-                  markers=True)
+    fig_pnl = px.line(chart_long_dollar, x='week', y='Value', color='Metric',
+                      title="PnL Comparison Over Time",
+                      labels={'week': 'Week Ending'},
+                      markers=True)
 
-    for trace in fig.data:
+    for trace in fig_pnl.data:
         if trace.name in ['Buy & Hold PnL ($)', 'Strategy PnL ($)']:
             trace.update(hovertemplate='%{x|%Y-%m-%d}<br>%{fullData.name}: $%{y:,.2f}<extra></extra>')
 
     for metric in chart_long_pct['Metric'].unique():
-        fig.add_scatter(x=chart_long_pct[chart_long_pct['Metric'] == metric]['week'],
-                        y=chart_long_pct[chart_long_pct['Metric'] == metric]['Value'],
-                        mode='lines+markers',
-                        name=metric,
-                        yaxis='y2',
-                        hovertemplate='%{x|%Y-%m-%d}<br>%{fullData.name}: %{y:.2f}%<extra></extra>')
+        fig_pnl.add_scatter(x=chart_long_pct[chart_long_pct['Metric'] == metric]['week'],
+                            y=chart_long_pct[chart_long_pct['Metric'] == metric]['Value'],
+                            mode='lines+markers',
+                            name=metric,
+                            line_dash='dot',
+                            yaxis='y2',
+                            hovertemplate='%{x|%Y-%m-%d}<br>%{fullData.name}: %{y:.2f}%<extra></extra>')
 
-    fig.update_layout(
+    fig_pnl.update_layout(
         xaxis_title="Week Ending",
         yaxis_title="PnL ($)",
         yaxis2=dict(title="PnL (%)", overlaying='y', side='right'),
         legend_title="Metric",
         hovermode="x unified",
         dragmode='pan',
-        margin=dict(l=40, r=40, t=60, b=40)
+        margin=dict(l=40, r=40, t=60, b=40),
+        legend=dict(
+            x=0.02,
+            y=0.98,
+            xanchor='left',
+            yanchor='top',
+            bgcolor='rgba(0,0,0,0.5)',
+            bordercolor='white',
+            borderwidth=1
+        )
     )
 
     st.plotly_chart(
-        fig,
+        fig_pnl,
+        use_container_width=True,
+        config={
+            'scrollZoom': False,
+            'displayModeBar': True,
+            'modeBarButtonsToAdd': ['pan2d'],
+            'modeBarButtonsToRemove': ['zoom2d', 'lasso2d', 'select2d'],
+            'displaylogo': False
+        }
+    )
+
+    # ── Value Comparison Chart ────────────────────────────────────────────
+    st.subheader("Value Comparison Over Time")
+
+    chart_df['Strategy NAV'] = chart_df['cumulative_premium'] + chart_df['current_position_value']
+    chart_df['Buy & Hold NAV'] = chart_df['friday_close'] * num_shares
+
+    chart_long_value = chart_df.melt(id_vars=['week'],
+                                     value_vars=['Buy & Hold NAV', 'Strategy NAV'],
+                                     var_name='Metric', value_name='Value')
+
+    fig_value = px.line(chart_long_value, x='week', y='Value', color='Metric',
+                        title="Value Comparison Over Time",
+                        labels={'week': 'Week Ending'},
+                        markers=True)
+
+    for trace in fig_value.data:
+        if trace.name in ['Buy & Hold NAV', 'Strategy NAV']:
+            trace.update(hovertemplate='%{x|%Y-%m-%d}<br>%{fullData.name}: $%{y:,.2f}<extra></extra>')
+
+    fig_value.update_layout(
+        xaxis_title="Week Ending",
+        yaxis_title="Net Liquidation Value ($)",
+        legend_title="Metric",
+        hovermode="x unified",
+        dragmode='pan',
+        margin=dict(l=40, r=40, t=60, b=40),
+        legend=dict(
+            x=0.02,
+            y=0.98,
+            xanchor='left',
+            yanchor='top',
+            bgcolor='rgba(0,0,0,0.5)',
+            bordercolor='white',
+            borderwidth=1
+        )
+    )
+
+    st.plotly_chart(
+        fig_value,
         use_container_width=True,
         config={
             'scrollZoom': False,
@@ -437,12 +493,10 @@ if st.button("Run Weekly Backtest", type="primary"):
     )
 
     st.info("""
-    - **Buy & Hold PnL (%)** is static vs initial capital
-    - **Strategy PnL (%)** is dynamic vs the running max capital required at each week
+    - **Buy & Hold NAV** is shares × current price
+    - **Strategy NAV** is cumulative premiums + shares value
     - Click + drag pans the chart; scroll wheel or box select to zoom
-    - Hover shows exact $ and % values (rounded to 2 decimals)
-    - **Net Cash Inflows** = premium + assignment proceeds received this week (positive)
-    - **Net Cash Outflows** = re-entry cost paid this week (negative if occurred, $0 otherwise)
+    - Hover shows exact $ values (rounded to 2 decimals)
     """)
 
     # ── Disclaimer, Methodology & Credit ──────────────────────────────────────
