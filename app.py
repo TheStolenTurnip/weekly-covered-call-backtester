@@ -142,6 +142,11 @@ if symbol:
             margin=dict(l=40, r=40, t=60, b=40)
         )
 
+# Custom hover with $ and 2 decimals
+        price_fig.update_traces(
+            hovertemplate='Date: %{x|%Y-%m-%d}<br>Close: $%{y:,.2f}<extra></extra>'
+        )
+
         st.plotly_chart(
             price_fig,
             use_container_width=True,
