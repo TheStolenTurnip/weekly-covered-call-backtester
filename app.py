@@ -7,7 +7,6 @@ from scipy.stats import norm
 import math
 import yfinance as yf
 
-
 def black_scholes_call(S, K, T, r, sigma):
     """European call (Black-Scholes)"""
     if sigma <= 0 or T <= 0:
@@ -84,22 +83,30 @@ if use_date_range and entry_date >= exit_date:
 # ── Fetch stock data ──────────────────────────────────────────────────────
 @st.cache_data(ttl=3600 * 24 * 7)
 def fetch_stock_data(symbol):
-    try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period="max", interval="1d")
-        if df.empty:
-            return None
-        df = df.reset_index()
-        df = df.rename(columns={'Date': 'date', 'Open': 'open', 'Close': 'close'})
-        df['date'] = pd.to_datetime(df['date']).dt.tz_localize(None)
-        df = df[['date', 'open', 'close']]
-        return df
-    except Exception as e:
-        error_msg = str(e)
-        st.error(f"Error fetching data: {error_msg}")
-        if "Too Many Requests" in error_msg or "rate limit" in error_msg.lower():
-            st.warning("Yahoo Finance rate limit hit. Please wait 10–30 minutes and try again.")
-        return None
+    import time
+    for attempt in range(3):
+        try:
+            ticker = yf.Ticker(symbol)
+            df = ticker.history(period="max", interval="1d")
+            if df.empty:
+                st.warning("No data returned from Yahoo Finance.")
+                return None
+            df = df.reset_index()
+            df = df.rename(columns={'Date': 'date', 'Open': 'open', 'Close': 'close'})
+            df['date'] = pd.to_datetime(df['date']).dt.tz_localize(None)
+            df = df[['date', 'open', 'close']]
+            return df
+        except Exception as e:
+            error_msg = str(e)
+            if "Too Many Requests" in error_msg or "rate limit" in error_msg.lower():
+                wait = 10 * (attempt + 1)
+                st.warning(f"Rate limit hit — auto-retrying in {wait} seconds...")
+                time.sleep(wait)
+            else:
+                st.error(f"Error fetching data: {error_msg}")
+                return None
+    st.error("Failed after 3 retries due to rate limiting. Try again in 30–60 minutes.")
+    return None
 
 
 if symbol:
@@ -149,6 +156,8 @@ if symbol:
     else:
         st.info("No price data available for this ticker.")
 
+with st.spinner("Loading stock data... (may take a moment on first load)"):
+    df = fetch_stock_data(symbol)
 
 # ── Backtest ──────────────────────────────────────────────────────────────
 if st.button("Run Weekly Backtest", type="primary"):
