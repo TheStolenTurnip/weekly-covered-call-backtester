@@ -85,7 +85,7 @@ strike_increment = st.selectbox(
 )
 
 with col2:
-    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=75.0, step=5.0,
+    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=100.0, step=5.0,
                                  help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
 with col3:
     num_shares = st.number_input("Shares (1 lot)", min_value=100, value=100, step=100,
@@ -220,6 +220,13 @@ if st.button("Run Weekly Backtest", type="primary"):
     current_capital = initial_capital
     running_max_capital = initial_capital
 
+    # Calculate start/end dates from the filtered backtest_df (before set_index)
+    bh_start_date = "N/A"
+    bh_end_date = "N/A"
+    if not backtest_df.empty and 'date' in backtest_df.columns:
+        bh_start_date = backtest_df['date'].min().strftime('%Y-%m-%d')
+        bh_end_date = backtest_df['date'].max().strftime('%Y-%m-%d')
+
     backtest_df.set_index('date', inplace=True)
     df_weekly = backtest_df.resample('W-FRI').agg({
         'open': 'first',
@@ -327,15 +334,8 @@ if st.button("Run Weekly Backtest", type="primary"):
     df_strategy['missed_upside'] = df_strategy['missed_upside'].fillna(0.0)
     df_strategy['net_liq_value'] = df_strategy['net_liq_value'].fillna(0.0)
 
-    # Calculate start/end dates from ORIGINAL df (before any set_index or filtering)
-    bh_start_date = "N/A"
-    bh_end_date = "N/A"
-    if not df.empty and 'date' in df.columns:
-        bh_start_date = df['date'].min().strftime('%Y-%m-%d')
-        bh_end_date = df['date'].max().strftime('%Y-%m-%d')
-
     bh_start_price = initial_price
-    bh_end_price = df['close'].iloc[-1]
+    bh_end_price = backtest_df['close'].iloc[-1] if not backtest_df.empty else initial_price
     bh_pnl_dollar = (bh_end_price - bh_start_price) * num_shares
     bh_pnl_pct = ((bh_end_price / bh_start_price) - 1) * 100 if bh_start_price > 0 else 0.0
 
