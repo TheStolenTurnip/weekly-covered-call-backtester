@@ -67,7 +67,7 @@ if symbol:
                 most_common = Counter(diffs).most_common(1)[0][0]
                 if most_common > 0:
                     real_increment = most_common
-                    detected_message = f"Lowest increment detected from nearest expiration: **${real_increment:.2f}** (may differ from actual Strike Displays)"
+                    detected_message = f"Lowest increment detected from Yahoo Finance: **${real_increment:.2f}** (may differ from actual Strike Displays)"
     except Exception as e:
         detected_message = f"Could not fetch options chain: {str(e)}"
 
