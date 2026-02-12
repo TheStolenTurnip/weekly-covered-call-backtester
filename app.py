@@ -6,6 +6,7 @@ import numpy as np
 from scipy.stats import norm
 import math
 import yfinance as yf
+from collections import Counter
 
 
 def black_scholes_call(S, K, T, r, sigma):
@@ -48,6 +49,41 @@ st.caption("Simulated weekly covered calls vs buy & hold — premiums are cash (
 col1, col2, col3 = st.columns(3)
 with col1:
     symbol = st.text_input("Ticker", value="BMNR").upper().strip()
+
+# ── Real strike increment detection from options chain ─────────────────────
+real_increment = 0.50  # default fallback
+detected_message = ""
+
+if symbol:
+    try:
+        ticker = yf.Ticker(symbol)
+        expirations = ticker.options
+        if expirations:
+            chain = ticker.option_chain(expirations[0])   # nearest expiration
+            calls = chain.calls
+            strikes = sorted(calls['strike'].unique())
+            if len(strikes) >= 3:
+                diffs = [strikes[i+1] - strikes[i] for i in range(len(strikes)-1)]
+                most_common = Counter(diffs).most_common(1)[0][0]
+                if most_common > 0:
+                    real_increment = most_common
+                    detected_message = f"Lowest increment detected from nearest expiration: **${real_increment:.2f}** (may differ from actual Strike Displays)"
+    except Exception as e:
+        detected_message = f"Could not fetch options chain: {str(e)}"
+
+if detected_message:
+    st.info(detected_message)
+
+strike_increment_options = [0.25, 0.50, 1.00, 2.50, 5.00, 7.50, 10.00, 12.50]
+
+strike_increment = st.selectbox(
+    "Strike price increment",
+    options=strike_increment_options,
+    index=strike_increment_options.index(real_increment) if real_increment in strike_increment_options else 1,
+    format_func=lambda x: f"${x:.2f}",
+    help="Strike price increments detected from Yahoo Finance may differ from the actual options chain. Always check the full strike display offered by your broker and select the correct increment manually if needed."
+)
+
 with col2:
     iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=100.0, step=5.0,
                                  help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
@@ -168,16 +204,24 @@ if st.button("Run Weekly Backtest", type="primary"):
         st.error("No data available. Try a different ticker.")
         st.stop()
 
+    # Apply date range filter if selected
+    backtest_df = df.copy()
     if use_date_range:
-        df = backtest_df
+        backtest_df = backtest_df[
+            (backtest_df['date'].dt.date >= entry_date) &
+            (backtest_df['date'].dt.date <= exit_date)
+        ]
+        if backtest_df.empty:
+            st.error("No data in selected date range.")
+            st.stop()
 
-    initial_price = df['close'].iloc[0]
+    initial_price = backtest_df['close'].iloc[0]
     initial_capital = initial_price * num_shares
     current_capital = initial_capital
     running_max_capital = initial_capital
 
-    df.set_index('date', inplace=True)
-    df_weekly = df.resample('W-FRI').agg({
+    backtest_df.set_index('date', inplace=True)
+    df_weekly = backtest_df.resample('W-FRI').agg({
         'open': 'first',
         'close': 'last'
     }).dropna().reset_index()
@@ -214,7 +258,7 @@ if st.button("Run Weekly Backtest", type="primary"):
             })
             continue
 
-        strike = math.ceil(monday_open * 2) / 2
+        strike = math.ceil(monday_open / strike_increment) * strike_increment
         T = 7 / 365.0
         r = 0.05
 
@@ -283,8 +327,13 @@ if st.button("Run Weekly Backtest", type="primary"):
     df_strategy['missed_upside'] = df_strategy['missed_upside'].fillna(0.0)
     df_strategy['net_liq_value'] = df_strategy['net_liq_value'].fillna(0.0)
 
-    bh_start_date = df.index.min().strftime('%Y-%m-%d')
-    bh_end_date = df.index.max().strftime('%Y-%m-%d')
+    # Use original df for start/end dates (always has datetime index)
+    bh_start_date = "N/A"
+    bh_end_date = "N/A"
+    if not df.empty and pd.api.types.is_datetime64_any_dtype(df.index):
+        bh_start_date = df.index.min().strftime('%Y-%m-%d')
+        bh_end_date = df.index.max().strftime('%Y-%m-%d')
+
     bh_start_price = initial_price
     bh_end_price = df['close'].iloc[-1]
     bh_pnl_dollar = (bh_end_price - bh_start_price) * num_shares
@@ -298,7 +347,6 @@ if st.button("Run Weekly Backtest", type="primary"):
     total_pnl_incl_premium = shares_pnl + total_premium
     total_pnl_pct_vs_max = (total_pnl_incl_premium / running_max_capital) * 100 if running_max_capital > 0 else 0.0
 
-    # Net Liquidation Value = total premiums + final position value
     bh_net_liq = bh_end_price * num_shares
     strategy_net_liq = total_premium + final_position_value
 
@@ -348,7 +396,7 @@ if st.button("Run Weekly Backtest", type="primary"):
             'week': st.column_config.Column("Week", help="Week ending date (Friday)"),
             'monday_open': st.column_config.Column("Monday Open", help="Stock open price used for strike"),
             'friday_close': st.column_config.Column("Friday Close", help="Stock price at expiration"),
-            'strike': st.column_config.Column("Strike", help="Call strike sold (next $0.50 above open)"),
+            'strike': st.column_config.Column("Strike", help="Call strike sold (rounded to selected increment)"),
             'premium_collected': st.column_config.Column("Premium", help="Estimated cash from selling the call"),
             'cumulative_premium': st.column_config.Column("Cum. Premium", help="Running total of premiums"),
             'assignment_gain': st.column_config.Column(
@@ -375,10 +423,10 @@ if st.button("Run Weekly Backtest", type="primary"):
 
     chart_df = df_strategy[['week', 'Running Max Capital', 'cumulative_premium', 'cost_basis_per_share', 'friday_close']].copy()
 
-    # Use last known remaining_shares for chart (since it's not in df_strategy anymore)
+    # Use last known remaining_shares for chart (constant after last event)
     chart_df['remaining_shares'] = final_remaining_shares
     chart_df['current_position_value'] = chart_df['remaining_shares'] * chart_df['friday_close']
-    chart_df['current_invested'] = chart_df['remaining_shares'] * chart_df['cost_basis_per_share'].fillna(0)
+    chart_df['current_invested'] = chart_df['remaining_shares'] * chart_df['cost_basis_per_share']
     chart_df['Strategy PnL ($)'] = chart_df['cumulative_premium'] + chart_df['current_position_value'] - chart_df['current_invested']
 
     chart_df['Strategy PnL (%)'] = (chart_df['Strategy PnL ($)'] / chart_df['Running Max Capital']) * 100
@@ -517,7 +565,7 @@ if st.button("Run Weekly Backtest", type="primary"):
       - **American**: Binomial tree (Cox-Ross-Rubinstein) with 100 steps (allows early exercise check)
     - Inputs used:
       - Spot price = Monday's open price
-      - Strike = nearest $0.50 **above** Monday open (slightly OTM)
+      - Strike = rounded to selected increment above Monday open
       - Time to expiration = 7 days (exactly 7/365 years)
       - Risk-free rate = fixed 5% (0.05)
       - Implied volatility = **user-entered value** (default 100%) — **not** real historical IV
