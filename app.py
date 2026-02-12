@@ -85,7 +85,7 @@ strike_increment = st.selectbox(
 )
 
 with col2:
-    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=100.0, step=5.0,
+    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=75.0, step=5.0,
                                  help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
 with col3:
     num_shares = st.number_input("Shares (1 lot)", min_value=100, value=100, step=100,
