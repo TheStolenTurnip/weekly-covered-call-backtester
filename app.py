@@ -67,7 +67,7 @@ if symbol:
                 most_common = Counter(diffs).most_common(1)[0][0]
                 if most_common > 0:
                     real_increment = most_common
-                    detected_message = f"Detected real strike increment from current chain: **${real_increment:.2f}** (nearest expiration)"
+                    detected_message = f"Detected strike increment from current chain: **${real_increment:.2f}** (nearest expiration)"
     except Exception as e:
         detected_message = f"Could not fetch options chain: {str(e)}"
 
