@@ -67,7 +67,7 @@ if symbol:
                 most_common = Counter(diffs).most_common(1)[0][0]
                 if most_common > 0:
                     real_increment = most_common
-                    detected_message = f"Lowest increment detected from Yahoo Finance: **${real_increment:.2f}** (may differ from actual Strike Display)"
+                    detected_message = f"Detected real strike increment from current chain: **${real_increment:.2f}** (nearest expiration)"
     except Exception as e:
         detected_message = f"Could not fetch options chain: {str(e)}"
 
@@ -85,7 +85,7 @@ strike_increment = st.selectbox(
 )
 
 with col2:
-    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=100.0, step=5.0,
+    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=75.0, step=5.0,
                                  help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
 with col3:
     num_shares = st.number_input("Shares (1 lot)", min_value=100, value=100, step=100,
@@ -327,12 +327,12 @@ if st.button("Run Weekly Backtest", type="primary"):
     df_strategy['missed_upside'] = df_strategy['missed_upside'].fillna(0.0)
     df_strategy['net_liq_value'] = df_strategy['net_liq_value'].fillna(0.0)
 
-    # Use original df for start/end dates (always has datetime index)
+    # Calculate start/end dates from ORIGINAL df (before any set_index or filtering)
     bh_start_date = "N/A"
     bh_end_date = "N/A"
-    if not df.empty and pd.api.types.is_datetime64_any_dtype(df.index):
-        bh_start_date = df.index.min().strftime('%Y-%m-%d')
-        bh_end_date = df.index.max().strftime('%Y-%m-%d')
+    if not df.empty and 'date' in df.columns:
+        bh_start_date = df['date'].min().strftime('%Y-%m-%d')
+        bh_end_date = df['date'].max().strftime('%Y-%m-%d')
 
     bh_start_price = initial_price
     bh_end_price = df['close'].iloc[-1]
