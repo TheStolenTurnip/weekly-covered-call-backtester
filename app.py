@@ -672,7 +672,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         'NAV': st.column_config.Column(
             "NAV",
             help="Total account value at end of week: cash (premiums + proceeds) + position value (or Net Liquidation Value)",
-            width=80
+            width=100
         ),
     }
 
