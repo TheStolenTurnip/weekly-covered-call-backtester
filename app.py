@@ -42,8 +42,8 @@ def binomial_american_call(S, K, T, r, sigma, n=100):
 st.set_page_config(page_title="Weekly ATM / Slightly OTM Covered Calls Backtester", layout="wide")
 
 
-# ── Clock ────────────────────────────────────────────────────────────────
-col_title, col_clock = st.columns([7, 1.5])
+# ── Clock: Local time + NY time + difference (fixed calculation) ──────────
+col_title, col_clock = st.columns([7, 1.5])  # Wider title to avoid cut-off
 
 with col_title:
     st.title("Weekly ATM (Or Slightly OTM) Covered Calls Backtester")
@@ -56,7 +56,7 @@ with col_clock:
             <div style="font-size: 1.0em; color: #ddd; margin-bottom: 2px;">Your Local Time</div>
             <div id="localTime" style="font-size: 1.8em; font-weight: bold; letter-spacing: 1px;"></div>
             
-            <div style="font-size: 1.0em; color: #ddd; margin: 8px 0 2px 0;">NY Eastern Time</div>
+            <div style="font-size: 1.0em; color: #ddd; margin: 8px 0 2px 0;">NY Eastern</div>
             <div id="nyTime" style="font-size: 1.5em; font-weight: bold; letter-spacing: 1px;"></div>
             
             <div id="diff" style="font-size: 0.9em; margin-top: 6px; font-weight: 500;"></div>
@@ -66,6 +66,7 @@ with col_clock:
             function updateClock() {
                 const now = new Date();
 
+                // Local time
                 const local = now.toLocaleTimeString('en-US', {
                     hour12: false,
                     hour: '2-digit',
@@ -74,6 +75,7 @@ with col_clock:
                 });
                 document.getElementById('localTime').innerText = local;
 
+                // NY time
                 const ny = now.toLocaleTimeString('en-US', {
                     timeZone: 'America/New_York',
                     hour12: false,
@@ -83,18 +85,25 @@ with col_clock:
                 });
                 document.getElementById('nyTime').innerText = ny + ' ET';
 
-                const localOffset = -now.getTimezoneOffset() / 60;
-                const nyDate = new Date(now.toLocaleString('en-US', {timeZone: 'America/New_York'}));
-                const nyOffset = -nyDate.getTimezoneOffset() / 60;
+                // Accurate difference using Intl
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                    timeZone: 'America/New_York',
+                    timeZoneName: 'shortOffset'
+                });
+                const nyParts = formatter.formatToParts(now);
+                const nyOffsetStr = nyParts.find(p => p.type === 'timeZoneName').value; // e.g. "GMT-5" or "GMT-4"
+                const nyOffset = parseInt(nyOffsetStr.replace('GMT', '')) || 0;
+
+                const localOffset = -now.getTimezoneOffset() / 60; // positive for east of UTC
                 const diff = Math.round(localOffset - nyOffset);
 
                 let diffText = '';
                 if (diff > 0) {
-                    diffText = `+${diff}h ahead of NY`;
+                    diffText = `Your are ${diff} hours ahead of NY`;
                 } else if (diff < 0) {
-                    diffText = `${diff}h behind NY`;
+                    diffText = `Your are ${diff} hours behind NY`;
                 } else {
-                    diffText = 'Same as NY';
+                    diffText = 'Same as NY time';
                 }
                 document.getElementById('diff').innerText = diffText;
             }
@@ -103,9 +112,8 @@ with col_clock:
             setInterval(updateClock, 1000);
         </script>
         """,
-        height=150
+        height=150  # Reduced height to fit better
     )
-
 
 # ── Inputs ────────────────────────────────────────────────────────────────
 col1, col2, col3 = st.columns(3)
@@ -143,10 +151,11 @@ strike_increment = st.selectbox(
 )
 
 with col2:
-    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=75.0, step=5.0) / 100.0
+    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=75.0, step=5.0,
+                                 help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
 with col3:
-    num_shares = st.number_input("Shares (1 lot)", min_value=100, value=100, step=100)
-
+    num_shares = st.number_input("Shares (1 lot)", min_value=100, value=100, step=100,
+                                help="Number of shares held / contracts written")
 option_style = st.radio(
     "Option Pricing Model",
     options=["European (Black-Scholes)", "American (Binomial Tree)"],
@@ -155,25 +164,18 @@ option_style = st.radio(
 
 col_a, col_b = st.columns(2)
 with col_a:
-    use_date_range = st.checkbox("Use custom date range", value=False, key="use_custom_range")
+    use_date_range = st.checkbox("Use custom date range", value=False)
 with col_b:
-    reopen_if_assigned = st.checkbox("Re-open after assignment", value=True)
+    reopen_if_assigned = st.checkbox("Re-open after assignment", value=True,
+                                     help="Buy back the same number of shares next Monday (open) if assigned")
 
-
-# ── Date inputs ───────────────────────────────────────────────────────────
-entry_date = st.date_input(
-    "Entry date (start)",
-    value=datetime(2025, 7, 14),
-    disabled=not use_date_range,
-    key="entry_date_input"
-)
-
-exit_date = st.date_input(
-    "Exit date (end)",
-    value=datetime(2026, 2, 13),
-    disabled=not use_date_range,
-    key="exit_date_input"
-)
+# ── Date inputs (with keys) ───────────────────────────────────────────────
+entry_date = st.date_input("Entry date (start)", value=datetime(2025, 7, 14),
+                           disabled=not use_date_range,
+                           help="Start of backtest period")
+exit_date = st.date_input("Exit date (end)", value=datetime(2026, 2, 13),
+                          disabled=not use_date_range,
+                          help="End of backtest period")
 
 if use_date_range and entry_date >= exit_date:
     st.error("Entry date must be before exit date.")
@@ -238,7 +240,7 @@ if symbol:
         st.plotly_chart(price_fig, use_container_width=True)
 
 
-# ── Backtest ──────────────────────────────────────────────────────────────
+# ── Backtest (your original code) ─────────────────────────────────────────
 if st.button("Run Weekly Backtest", type="primary"):
     if df is None or df.empty:
         st.error("No data available.")
@@ -402,7 +404,7 @@ if st.button("Run Weekly Backtest", type="primary"):
     final_position_value = final_remaining_shares * bh_end_price if final_remaining_shares > 0 else 0.0
     shares_pnl = final_position_value - (final_cost_basis * final_remaining_shares if final_cost_basis else 0)
     total_pnl_incl_premium = shares_pnl + total_premium
-    total_pnl_pct_vs_max = (total_pnl_incl_premium / running_max_capital) * 100 if running_max_capital > 0 else 0.0
+    total_pnl_pct_vs_max = (total_pnl_incl_premium / running_max_capital) * 100 if running_max_capital > 0 else 0
     strategy_net_liq = total_premium + final_position_value
 
     st.subheader("Strategy Summary")
@@ -421,9 +423,16 @@ if st.button("Run Weekly Backtest", type="primary"):
     with c3:
         st.metric("Net Liq Value", f"${strategy_net_liq:,.2f}",
                   help="Total account value at end: premiums + value of remaining shares")
-        st.metric("Strategy P&L ($)", f"${total_pnl_incl_premium:,.2f}",
-                  delta=f"{total_pnl_pct_vs_max:+.2f}%",
-                  help="Net gain including premiums + assignment proceeds + share P&L (return vs max capital required)")
+        st.metric(
+            "Strategy P&L ($)",
+            f"${total_pnl_incl_premium:,.2f}",
+            delta=f"{total_pnl_pct_vs_max:+.2f}%",
+            help="Net gain including premiums + assignment proceeds + share P&L (return vs max capital required)"
+        )
+
+        st.caption(
+            "Note: % Return uses max capital ever required as denominator (conservative return on peak commitment). Weekly yield uses each week's working capital."
+        )
 
     # ── Strategy Weekly Details ───────────────────────────────────────────────
     display_cols = [
@@ -432,10 +441,10 @@ if st.button("Run Weekly Backtest", type="primary"):
         'reentry_price', 'cost_basis_per_share', 'missed_upside',
         'working_capital', 'yield_on_cost', 'net_liq_value'
     ]
-    df_display = df_strategy[display_cols].copy()
+    df_display = df_strategy[display_cols]
 
-    # Fix: Make row index start from 1 (leftmost column numbers)
-    df_display.index = range(1, len(df_display) + 1)
+    # Add this line ↓
+    df_display.index = range(1, len(df_display) + 1)   # ← Makes left column start at 1
 
     st.subheader("Strategy Weekly Details")
     st.dataframe(
@@ -481,7 +490,6 @@ if st.button("Run Weekly Backtest", type="primary"):
                 help="Total account value at end of week: shares value + cumulative premiums + assignment gain that week"
             ),
         },
-        hide_index=False,  # Keep row numbers visible, but they now start from 1
         use_container_width=True,
     )
 
