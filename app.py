@@ -619,33 +619,33 @@ if st.button("Run Weekly Backtest", type="primary"):
     # 4. Your original column_config — unchanged! (all help texts & widths preserved)
     #    We just need to make sure the keys match the *new display names*
     column_config = {
-        'Week': st.column_config.Column("Week", help="Week ending date (Friday)", width=70),
-        'Mon Open': st.column_config.Column("Mon Open", help="Stock open price used for strike", width=55),
-        'Fri Close': st.column_config.Column("Fri Close", help="Stock price at expiration", width=55),
+        'Week': st.column_config.Column("Week", help="Week ending date (Friday)", width=65),
+        'Mon Open': st.column_config.Column("Mon Open", help="Stock open price used for strike", width=58),
+        'Fri Close': st.column_config.Column("Fri Close", help="Stock price at expiration", width=53),
         'Strike': st.column_config.Column("Strike", help="Call strike sold (rounded to selected increment)", width=45),
         'Prem': st.column_config.Column("Prem", help="Estimated cash from selling the call (dollar per lot = 100 shares)", width=100),
         'Asgmt Proc': st.column_config.Column(
             "Asgmt Proc",
             help="Net profit from assignment this week (strike - open price) × shares — $0 if not assigned\n\n "
             "Can be negative if strike below adj cost basis",
-            width=100
+            width=105
         ),
         'Weekly P&L': st.column_config.Column(
             "Weekly P&L",
             help="Net weekly P&L: premium + assignment gain/loss",
-            width=80
+            width=85
         ),
         'Assigned': st.column_config.Column("Assigned", help="Call was ITM or ATM and shares called away", width=50),
-        'Σ Prem': st.column_config.Column("Σ Prem", help="Running total of premiums", width=100),
+        'Σ Prem': st.column_config.Column("Σ Prem", help="Running total of premiums", width=105),
         'Σ Asgmt Proc': st.column_config.Column(
             "Σ Asgmt Proc",
             help="Running total of assignment gains/losses over all weeks",
-            width=85
+            width=105
         ),
         'Σ Weekly P&L': st.column_config.Column(
             "Σ Weekly P&L",
             help="Running total P&L over all weeks (sum of weekly P&L)",
-            width=85
+            width=105
         ),
         'Rebuy': st.column_config.Column("Rebuy", help="Price paid to buy back this week (if reopened after prior assignment)", width=45),
         'Cost': st.column_config.Column("Cost", help="Average cost per share of current position", width=50),
@@ -657,7 +657,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         'Missed $': st.column_config.Column(
             "Missed $",
             help="Extra gain given up on assigned weeks: (close - strike) × shares",
-            width=75
+            width=85
         ),
         'Running Cap': st.column_config.Column(
             "Running Cap",
