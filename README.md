@@ -22,10 +22,3 @@ https://weekly-covered-call-backtester.streamlit.app
 - Customizable stock, time period, strike increments, etc.
 
 Built with Streamlit + Python. Data sourced via public APIs (delayed).
-
-## Quick Local Run (Optional)
-
-1. Clone the repo:
-   ```bash
-   git clone https://github.com/TheStolenTurnip/weekly-covered-call-backtester.git
-   cd weekly-covered-call-backtester
