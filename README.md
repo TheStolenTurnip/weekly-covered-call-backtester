@@ -1,6 +1,6 @@
 # Weekly Covered Call Backtester
 
-Simulates Friday-expiry weekly ATM/OTM covered calls (Monday open → Friday close) vs buy-and-hold, Black-Scholes / Binomial to estimate historical option prices, assignment & rebuy logic, and P&L comparison charts.
+Simulates weekly Friday-expiry ATM / slightly OTM covered calls (Monday → Friday) vs buy-and-hold, estimated historical option prices using Black-Scholes/Binomial formulas, assignment & rebuy logic, P&L comparison charts.
 
 Live: https://weekly-covered-call-backtester.streamlit.app
 
