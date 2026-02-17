@@ -6,4 +6,4 @@ No installation needed — just click below:
 
 👉 [Launch Backtester → https://weekly-covered-call-backtester.streamlit.app](https://weekly-covered-call-backtester.streamlit.app)
 
-Features: Weekly ATM/OTM covered calls, assignment simulation, yield on cost, P&L vs buy & hold, live charts.
+Features: Weekly ATM/OTM covered calls, assignment simulation, yield on cost, P&L vs buy & hold, live charts (delayed).
