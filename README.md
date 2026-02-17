@@ -8,8 +8,6 @@ Simulated weekly covered calls (ATM/OTM) vs. buy-and-hold on selected stocks. Pr
 
 Run the backtester directly in your browser — no installation required:
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://weekly-covered-call-backtester.streamlit.app/)
-
 https://weekly-covered-call-backtester.streamlit.app
 
 ## Features
