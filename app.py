@@ -623,7 +623,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         'Mon Open': st.column_config.Column("Mon Open", help="Stock open price used for strike", width=65),
         'Fri Close': st.column_config.Column("Fri Close", help="Stock price at expiration", width=65),
         'Strike': st.column_config.Column("Strike", help="Call strike sold (rounded to selected increment)", width=55),
-        'Prem': st.column_config.Column("Prem", help="Estimated cash from selling the call (per lot = 100 shares)", width=55),
+        'Prem': st.column_config.Column("Prem", help="Estimated cash from selling the call (dollar per lot = 100 shares)", width=55),
         'Asgmt Proc': st.column_config.Column(
             "Asgmt Proc",
             help="Net profit from assignment this week (strike - open price) × shares — $0 if not assigned\n\n "
