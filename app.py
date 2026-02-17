@@ -636,7 +636,7 @@ if st.button("Run Weekly Backtest", type="primary"):
             width=80
         ),
         'Assigned': st.column_config.Column("Assigned", help="Call was ITM or ATM and shares called away", width=65),
-        'Σ Prem': st.column_config.Column("Σ Prem", help="Running total of premiums", width=60),
+        'Σ Prem': st.column_config.Column("Σ Prem", help="Running total of premiums", width=80),
         'Σ Asgmt Proc': st.column_config.Column(
             "Σ Asgmt Proc",
             help="Running total of assignment gains/losses over all weeks",
@@ -672,7 +672,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         'NAV': st.column_config.Column(
             "NAV",
             help="Total account value at end of week: cash (premiums + proceeds) + position value (or Net Liquidation Value)",
-            width=60
+            width=80
         ),
     }
 
