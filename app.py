@@ -620,9 +620,9 @@ if st.button("Run Weekly Backtest", type="primary"):
     #    We just need to make sure the keys match the *new display names*
     column_config = {
         'Week': st.column_config.Column("Week", help="Week ending date (Friday)", width=70),
-        'Mon Open': st.column_config.Column("Mon Open", help="Stock open price used for strike", width=50),
-        'Fri Close': st.column_config.Column("Fri Close", help="Stock price at expiration", width=50),
-        'Strike': st.column_config.Column("Strike", help="Call strike sold (rounded to selected increment)", width=50),
+        'Mon Open': st.column_config.Column("Mon Open", help="Stock open price used for strike", width=55),
+        'Fri Close': st.column_config.Column("Fri Close", help="Stock price at expiration", width=55),
+        'Strike': st.column_config.Column("Strike", help="Call strike sold (rounded to selected increment)", width=45),
         'Prem': st.column_config.Column("Prem", help="Estimated cash from selling the call (dollar per lot = 100 shares)", width=100),
         'Asgmt Proc': st.column_config.Column(
             "Asgmt Proc",
@@ -647,7 +647,7 @@ if st.button("Run Weekly Backtest", type="primary"):
             help="Running total P&L over all weeks (sum of weekly P&L)",
             width=85
         ),
-        'Rebuy': st.column_config.Column("Rebuy", help="Price paid to buy back this week (if reopened after prior assignment)", width=50),
+        'Rebuy': st.column_config.Column("Rebuy", help="Price paid to buy back this week (if reopened after prior assignment)", width=45),
         'Cost': st.column_config.Column("Cost", help="Average cost per share of current position", width=50),
         'Adj Cost': st.column_config.Column(
             "Adj Cost",
@@ -662,7 +662,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         'Running Cap': st.column_config.Column(
             "Running Cap",
             help="Cost of shares held during that week (purchase cost × shares)",
-            width=85
+            width=90
         ),
         'Y%': st.column_config.Column(
             "Y%",
