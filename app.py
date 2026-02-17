@@ -628,7 +628,7 @@ if st.button("Run Weekly Backtest", type="primary"):
             "Asgmt Proc",
             help="Net profit from assignment this week (strike - open price) × shares — $0 if not assigned\n\n "
             "Can be negative if strike below adj cost basis",
-            width=105
+            width=100
         ),
         'Weekly P&L': st.column_config.Column(
             "Weekly P&L",
@@ -647,27 +647,27 @@ if st.button("Run Weekly Backtest", type="primary"):
             help="Running total P&L over all weeks (sum of weekly P&L)",
             width=105
         ),
-        'Rebuy': st.column_config.Column("Rebuy", help="Price paid to buy back this week (if reopened after prior assignment)", width=45),
-        'Cost': st.column_config.Column("Cost", help="Average cost per share of current position", width=50),
+        'Rebuy': st.column_config.Column("Rebuy", help="Price paid to buy back this week (if reopened after prior assignment)", width=57),
+        'Cost': st.column_config.Column("Cost", help="Average cost per share of current position", width=47),
         'Adj Cost': st.column_config.Column(
             "Adj Cost",
             help="Effective cost basis (raw cost - premiums on this lot / shares); * = new lot after re-buy",
-            width=50
+            width=47
         ),
         'Missed $': st.column_config.Column(
             "Missed $",
             help="Extra gain given up on assigned weeks: (close - strike) × shares",
-            width=85
+            width=95
         ),
         'Running Cap': st.column_config.Column(
             "Running Cap",
             help="Cost of shares held during that week (purchase cost × shares)",
-            width=95
+            width=100
         ),
         'Y%': st.column_config.Column(
             "Y%",
             help="Weekly premium ÷ working capital this week × 100",
-            width=45
+            width=43
         ),
         'NAV': st.column_config.Column(
             "NAV",
