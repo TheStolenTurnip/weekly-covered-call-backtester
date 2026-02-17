@@ -623,7 +623,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         'Mon Open': st.column_config.Column("Mon Open", help="Stock open price used for strike", width=58),
         'Fri Close': st.column_config.Column("Fri Close", help="Stock price at expiration", width=53),
         'Strike': st.column_config.Column("Strike", help="Call strike sold (rounded to selected increment)", width=45),
-        'Prem': st.column_config.Column("Prem", help="Estimated cash from selling the call (dollar per lot = 100 shares)", width=100),
+        'Prem': st.column_config.Column("Prem", help="Estimated cash from selling the call (dollar per lot = 100 shares)", width=90 ),
         'Asgmt Proc': st.column_config.Column(
             "Asgmt Proc",
             help="Net profit from assignment this week (strike - open price) × shares — $0 if not assigned\n\n "
@@ -633,7 +633,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         'Weekly P&L': st.column_config.Column(
             "Weekly P&L",
             help="Net weekly P&L: premium + assignment gain/loss",
-            width=85
+            width=95
         ),
         'Assigned': st.column_config.Column("Assigned", help="Call was ITM or ATM and shares called away", width=50),
         'Σ Prem': st.column_config.Column("Σ Prem", help="Running total of premiums", width=105),
@@ -662,7 +662,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         'Running Cap': st.column_config.Column(
             "Running Cap",
             help="Cost of shares held during that week (purchase cost × shares)",
-            width=90
+            width=95
         ),
         'Y%': st.column_config.Column(
             "Y%",
