@@ -620,7 +620,7 @@ if st.button("Run Weekly Backtest", type="primary"):
     #    We just need to make sure the keys match the *new display names*
     column_config = {
         'Week': st.column_config.Column("Week", help="Week ending date (Friday)", width=62),
-        'Mon Open': st.column_config.Column("Mon Open", help="Open price used for strike selection (custom start date for week 1, then first trading day of each week)", width=60),
+        'Mon Open': st.column_config.Column("Mon Open", help="Open price used for strike selection — uses your custom Entry date open on the very first row, then Monday (or first trading day) open for every subsequent week", width=60),
         'Fri Close': st.column_config.Column("Fri Close", help="Stock price at expiration", width=52),
         'Strike': st.column_config.Column("Strike", help="Call strike sold (rounded to selected increment)", width=45),
         'Prem': st.column_config.Column("Prem", help="Estimated cash from selling the call (dollar per lot = 100 shares)", width=88 ),
@@ -675,9 +675,6 @@ if st.button("Run Weekly Backtest", type="primary"):
             width=100
         ),
     }
-
-    # ── Strategy Weekly Details ───────────────────────────────────────────────
-    st.subheader("Strategy Weekly Details")
 
     # 1. Make sure "Mon Open" and "Rebuy" become numeric so na_rep works
     table_df['Mon Open'] = pd.to_numeric(table_df['Mon Open'], errors='coerce')
