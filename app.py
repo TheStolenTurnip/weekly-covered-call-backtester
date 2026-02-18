@@ -620,7 +620,7 @@ if st.button("Run Weekly Backtest", type="primary"):
     #    We just need to make sure the keys match the *new display names*
     column_config = {
         'Week': st.column_config.Column("Week", help="Week ending date (Friday)", width=62),
-        'Mon Open': st.column_config.Column("Mon Open", help="Stock open price used for strike", width=60),
+        'Mon Open': st.column_config.Column("Mon Open", help="Open price used for strike selection (custom start date for week 1, then first trading day of each week)", width=60),
         'Fri Close': st.column_config.Column("Fri Close", help="Stock price at expiration", width=52),
         'Strike': st.column_config.Column("Strike", help="Call strike sold (rounded to selected increment)", width=45),
         'Prem': st.column_config.Column("Prem", help="Estimated cash from selling the call (dollar per lot = 100 shares)", width=88 ),
@@ -676,7 +676,25 @@ if st.button("Run Weekly Backtest", type="primary"):
         ),
     }
 
-    # 5. Formatting (same logic as before, just using display names)
+    # ── Strategy Weekly Details ───────────────────────────────────────────────
+    st.subheader("Strategy Weekly Details")
+
+    # 1. Make sure "Mon Open" and "Rebuy" become numeric so na_rep works
+    table_df['Mon Open'] = pd.to_numeric(table_df['Mon Open'], errors='coerce')
+    table_df['Rebuy']    = pd.to_numeric(table_df['Rebuy'], errors='coerce')
+
+    # 2. Robust Adj Cost formatter (handles "N/A", floats, strings-with-*, None, etc.)
+    def format_adj_cost(x):
+        if pd.isna(x) or x is None or str(x).strip() in ["", "N/A", "nan", "None"]:
+            return "N/A"
+        try:
+            s = str(x).strip()
+            num = float(s.rstrip('*'))
+            star = "*" if s.endswith("*") else ""
+            return f"{num:,.2f}{star}"
+        except:
+            return str(x)
+
     st.dataframe(
         table_df.style.format({
             'Mon Open':    '${:,.2f}',
@@ -690,15 +708,12 @@ if st.button("Run Weekly Backtest", type="primary"):
             'Σ Weekly P&L':'${:,.2f}',
             'Rebuy':       '${:,.2f}',
             'Cost':        '${:,.2f}',
-            'Adj Cost': lambda x: (
-                f"{float(x.rstrip('*')):,.2f}" + 
-                ('*' if isinstance(x, str) and x.endswith('*') else '')
-            ) if pd.notna(x) else "",
+            'Adj Cost':    format_adj_cost,          # ← now safe
             'Y%':          '{:,.2f}%',
             'Missed $':    '${:,.2f}',
             'Running Cap': '${:,.2f}',
             'NAV':         '${:,.2f}',
-            }, na_rep="-"),
+        }, na_rep="—"),
         column_config=column_config,
         hide_index=False,
         use_container_width=True,
