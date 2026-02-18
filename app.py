@@ -698,7 +698,7 @@ if st.button("Run Weekly Backtest", type="primary"):
             'Missed $':    '${:,.2f}',
             'Running Cap': '${:,.2f}',
             'NAV':         '${:,.2f}',
-        }),
+            }, na_rep="-"),
         column_config=column_config,
         hide_index=False,
         use_container_width=True,
