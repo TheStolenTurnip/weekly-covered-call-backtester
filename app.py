@@ -552,7 +552,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         )
         st.metric(
             "Current Position",
-            f"{final_remaining_shares} @ ${final_cost_basis:,.2f}" if final_cost_basis else "0",
+            f"{final_remaining_shares:,.0f} @ ${final_cost_basis:,.2f}" if final_cost_basis else "0",
             help="Number of shares still held at the end and their average cost basis per share (0 if fully assigned by end date and not re-entered)"
         )
         st.metric(
