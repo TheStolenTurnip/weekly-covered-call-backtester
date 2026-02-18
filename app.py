@@ -730,7 +730,8 @@ if st.button("Run Weekly Backtest", type="primary"):
         return styles
     
     st.dataframe(
-        table_df.style.apply(highlight_pnl, axis=1).format({  # ← added .apply            'Mon Open':    '${:,.2f}',
+        table_df.style.apply(highlight_pnl, axis=1).format({  # ← added .apply           
+            'Mon Open':    '${:,.2f}',
             'Fri Close':   '${:,.2f}',
             'Strike':      '${:,.2f}',
             'Prem':        '${:,.2f}',
