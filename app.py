@@ -301,7 +301,7 @@ if use_date_range and entry_date and exit_date:
         layer="below"
     )
 
-st.plotly_chart(price_fig, use_container_width=True, key="price_history_chart")
+st.plotly_chart(price_fig, width="stretch", key="price_history_chart")
 
 # ── Backtest ──────────────────────────────────────────────────────────────
 if st.button("Run Weekly Backtest", type="primary"):
@@ -323,6 +323,17 @@ if st.button("Run Weekly Backtest", type="primary"):
         if backtest_df.empty:
             st.error("No data in selected date range.")
             st.stop()
+
+    # ── Future-date warning ─────────────────────────────────────────────────
+    if use_date_range:
+        last_available = backtest_df['date'].max()
+        requested_end = pd.to_datetime(exit_date)
+        if last_available < requested_end:
+            st.warning(
+                f"⚠️ **Data only available up to {last_available.date()}**.\n\n"
+                f"Your selected Exit date ({exit_date}) is in the future — "
+                f"the backtest automatically stops at the last trading day available from yfinance."
+            )
 
     initial_price = backtest_df['open'].iloc[0]
     initial_capital = initial_price * num_shares
@@ -615,11 +626,21 @@ if st.button("Run Weekly Backtest", type="primary"):
     for col in numeric_short_cols:
         if col in table_df.columns:
             table_df[col] = table_df[col].fillna(0.0)
+    
+    # ── CSV Download Button ───────────────────────────────────────────────
+    csv = table_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Weekly Details as CSV",
+        data=csv,
+        file_name=f"{symbol}_covered_call_{bh_start_date}_to_{bh_end_date}.csv",
+        mime="text/csv",
+        width="stretch"
+    )
 
     # 4. Your original column_config — unchanged! (all help texts & widths preserved)
     #    We just need to make sure the keys match the *new display names*
     column_config = {
-        'Week': st.column_config.Column("Week", help="Week ending date (Friday)", width=62),
+        'Week': st.column_config.Column("Week", help="Week ending date (Friday)", width=65),
         'Mon Open': st.column_config.Column("Mon Open", help="Open price used for strike selection — uses your custom Entry date open on the very first row, then Monday (or first trading day) open for every subsequent week", width=60),
         'Fri Close': st.column_config.Column("Fri Close", help="Stock price at expiration", width=52),
         'Strike': st.column_config.Column("Strike", help="Call strike sold (rounded to selected increment)", width=45),
@@ -691,10 +712,25 @@ if st.button("Run Weekly Backtest", type="primary"):
             return f"{num:,.2f}{star}"
         except:
             return str(x)
-
+    
+    # ── Soft green/red highlighting (dark-theme friendly) ───────────────────
+    def highlight_pnl(row):
+        styles = [''] * len(row)
+        for i, col in enumerate(row.index):
+            if col in ['Weekly P&L', 'Σ Weekly P&L']:
+                try:
+                    # Clean the value so we can read it
+                    val = float(str(row[col]).replace('$', '').replace(',', '').strip())
+                    if val >= 0:
+                        styles[i] = 'background-color: rgba(16, 185, 129, 0.18); color: #4ade80'   # soft mint green
+                    else:
+                        styles[i] = 'background-color: rgba(239, 68, 68, 0.18); color: #f87171'     # soft rose red
+                except:
+                    pass
+        return styles
+    
     st.dataframe(
-        table_df.style.format({
-            'Mon Open':    '${:,.2f}',
+        table_df.style.apply(highlight_pnl, axis=1).format({  # ← added .apply            'Mon Open':    '${:,.2f}',
             'Fri Close':   '${:,.2f}',
             'Strike':      '${:,.2f}',
             'Prem':        '${:,.2f}',
@@ -713,7 +749,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         }, na_rep="—"),
         column_config=column_config,
         hide_index=False,
-        use_container_width=True,
+        width="stretch",
     )
 
     # ── PnL Comparison Over Time ──────────────────────────────────────────────
@@ -812,7 +848,7 @@ if st.button("Run Weekly Backtest", type="primary"):
 
     st.plotly_chart(
         fig_pnl,
-        use_container_width=True,
+        width="stretch",
         config={
             'scrollZoom': False,
             'displayModeBar': True,
@@ -860,7 +896,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         )
     )
 
-    st.plotly_chart(fig_value, use_container_width=True,
+    st.plotly_chart(fig_value, width="stretch",
                     config={'scrollZoom': False, 'displayModeBar': True,
                             'modeBarButtonsToAdd': ['pan2d'],
                             'modeBarButtonsToRemove': ['zoom2d', 'lasso2d', 'select2d'],
