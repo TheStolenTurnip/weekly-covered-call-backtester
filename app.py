@@ -849,10 +849,21 @@ if st.button("Run Weekly Backtest", type="primary"):
     )
 
     # ── Layout & hover ─────────────────────────────────────────────────────────
-    fig_pnl.update_traces(
-        hovertemplate='%{x|%Y-%m-%d}<br>%{fullData.name}: $%{y:,.2f}<extra></extra>',
-        selector=dict(name__in=['Strategy PnL ($)', 'Buy & Hold PnL ($)'])
-    )
+    
+    # ── ROBUST HOVER FIX for PnL chart ───────────────────────────────────────
+    for trace in fig_pnl.data:
+        if trace.name and trace.name.endswith('($)'):           # Dollar PnL lines
+            trace.hovertemplate = (
+                '%{x|%Y-%m-%d}<br>'
+                '%{fullData.name}: $%{y:,.2f}'
+                '<extra></extra>'
+            )
+        elif trace.name and trace.name.endswith('(%)'):         # Percent PnL lines
+            trace.hovertemplate = (
+                '%{x|%Y-%m-%d}<br>'
+                '%{fullData.name}: %{y:.2f}%'
+                '<extra></extra>'
+            )
 
     fig_pnl.update_layout(
         xaxis_title="Week Ending",
