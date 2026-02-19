@@ -176,17 +176,47 @@ if symbol:
         ticker = yf.Ticker(symbol)
         expirations = ticker.options
         if expirations:
-            chain = ticker.option_chain(expirations[0])
-            calls = chain.calls
-            strikes = sorted(calls['strike'].unique())
-            if len(strikes) >= 3:
-                diffs = [strikes[i+1] - strikes[i] for i in range(len(strikes)-1)]
-                most_common = Counter(diffs).most_common(1)[0][0]
-                if most_common > 0:
-                    real_increment = most_common
-                    detected_message = f"Detected strike increment from current chain: **${real_increment:.2f}** (nearest expiration)"
-    except Exception:
+            today = datetime.now().date()
+            price = ticker.info.get('regularMarketPrice') or ticker.history(period="1d")['Close'].iloc[-1]
+
+            for exp_str in expirations[:4]:          # only check first 4 (all ≤ ~28 DTE)
+                try:
+                    exp_date = datetime.strptime(exp_str, "%Y-%m-%d").date()
+                    dte = (exp_date - today).days
+                    if dte < 1 or dte > 14:          # keep it very front-week only
+                        continue
+
+                    chain = ticker.option_chain(exp_str)
+                    strikes = sorted(chain.calls['strike'].unique())
+
+                    # Filter to realistic covered-call zone only
+                    atm_strikes = [s for s in strikes if price * 0.60 <= s <= price * 1.40]
+                    if len(atm_strikes) >= 8:        # need enough points for reliable mode
+                        diffs = [round(atm_strikes[i+1] - atm_strikes[i], 2)
+                                for i in range(len(atm_strikes)-1)]
+                        most_common = Counter([d for d in diffs if d > 0.05]).most_common(1)[0][0]
+
+                        if most_common > 0:
+                            real_increment = most_common
+                            detected_message = f"Detected strike increment **${real_increment:.2f}** from nearest usable chain ({dte} DTE)"
+                            break
+                except:
+                    continue
+
+            # Ultra-fallback: original nearest-exp behavior
+            if not detected_message and expirations:
+                try:
+                    chain = ticker.option_chain(expirations[0])
+                    strikes = sorted(chain.calls['strike'].unique())
+                    if len(strikes) >= 3:
+                        diffs = [round(strikes[i+1] - strikes[i], 2) for i in range(len(strikes)-1)]
+                        real_increment = Counter([d for d in diffs if d > 0]).most_common(1)[0][0]
+                        detected_message = f"Detected **${real_increment:.2f}** (nearest exp — sparse data)"
+                except:
+                    pass
+    except:
         pass
+
 if detected_message:
     st.info(detected_message)
 
