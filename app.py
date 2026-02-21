@@ -8,6 +8,28 @@ import math
 import yfinance as yf
 from collections import Counter
 import time
+from datetime import datetime, timedelta
+
+def get_dynamic_dates(df):
+    """Returns sensible default entry/exit based on real yfinance data."""
+    if df is None or df.empty:
+        # safe fallback
+        return datetime(2025, 7, 14).date(), datetime(2026, 2, 20).date()
+    
+    latest = df['date'].max().date()
+    
+    # Most recent Friday ≤ latest trading day (weekday 4 = Friday)
+    days_back = (latest.weekday() - 4) % 7
+    last_friday = latest - timedelta(days=days_back)
+    
+    # 6-month lookback (≈26 weeks)
+    six_months_ago = last_friday - timedelta(days=182)
+    
+    # Don't go before the stock's first trading day
+    earliest = df['date'].min().date()
+    entry_default = max(six_months_ago, earliest)
+    
+    return entry_default, last_friday
 
 def black_scholes_call(S, K, T, r, sigma):
     if sigma <= 0 or T <= 0:
@@ -228,38 +250,8 @@ strike_increment = st.selectbox(
     format_func=lambda x: f"${x:.2f}",
 )
 
-with col2:
-    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=55.0, step=5.0,
-                                 help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
-with col3:
-    num_shares = st.number_input("Shares (by lot)", min_value=100, value=100, step=100,
-                                help="Number of shares held / contracts written")
-
-    
-option_style = st.radio("Pricing Model", ["European (Black-Scholes)", "American (Binomial)"], index=1,
-                        help="European: Black-Scholes (no early exercise)\nAmerican: Binomial tree (allows early exercise check)")
-
-col_a, col_b = st.columns(2)
-with col_a:
-    use_date_range = st.checkbox("Custom date range", value=False)
-with col_b:
-    reopen_if_assigned = st.checkbox("Re-open after assignment", value=True,
-                                     help="Buy back the same number of shares next Monday (open) if assigned")
-
-entry_date = st.date_input("Entry date (start)", value=datetime(2025, 7, 14),
-                           disabled=not use_date_range,
-                           help="Start of backtest period")
-exit_date = st.date_input("Exit date (end)", value=datetime(2026, 2, 13),
-                          disabled=not use_date_range,
-                          help="End of backtest period")
-
-if use_date_range and entry_date >= exit_date:
-    st.error("Start date must be before end date.")
-    st.stop()
-
-
 # ── Fetch stock data ──────────────────────────────────────────────────────
-@st.cache_data(ttl=3600 * 24 * 7)
+@st.cache_data(ttl=3600)
 def fetch_stock_data(symbol):
     for attempt in range(3):
         try:
@@ -287,6 +279,50 @@ if symbol:
     df = fetch_stock_data(symbol)
     if df is not None and not df.empty:
         full_df = df.copy()
+
+with col2:
+    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=55.0, step=5.0,
+                                 help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
+with col3:
+    num_shares = st.number_input("Shares (by lot)", min_value=100, value=100, step=100,
+                                help="Number of shares held / contracts written")
+
+option_style = st.radio("Pricing Model", ["European (Black-Scholes)", "American (Binomial)"], index=1,
+                        help="European: Black-Scholes (no early exercise)\nAmerican: Binomial tree (allows early exercise check)")
+
+# ── Dynamic Default Dates ────────────────────────────────────────────────
+# Fallbacks only used if yfinance completely fails (very rare)
+entry_default = datetime(2025, 7, 14).date()
+exit_default  = datetime(2026, 2, 13).date()   # ← change to 2026-02-20 when you want real latest data
+
+if df is not None and not df.empty:
+    entry_default, exit_default = get_dynamic_dates(df)
+
+col_a, col_b = st.columns(2)
+with col_a:
+    use_date_range = st.checkbox("Custom date range", value=True,
+                                 help="Uncheck for full history")
+with col_b:
+    reopen_if_assigned = st.checkbox("Re-open after assignment", value=True,
+                                     help="Buy back the same number of shares next Monday (open) if assigned")
+
+entry_date = st.date_input(
+    "Entry date (start)",
+    value=entry_default,
+    disabled=not use_date_range,
+    help="Defaults to ~6 months before the most recent Friday"
+)
+
+exit_date = st.date_input(
+    "Exit date (end)",
+    value=exit_default,
+    disabled=not use_date_range,
+    help="Defaults to the most recent Friday with data (last complete week)"
+)
+
+if use_date_range and entry_date >= exit_date:
+    st.error("Start date must be before end date.")
+    st.stop()
 
 # ── Price History Chart (shows immediately when ticker entered) ───────
 if use_date_range and entry_date and exit_date:
@@ -343,7 +379,7 @@ if st.button("Run Weekly Backtest", type="primary"):
 
     if use_date_range:
         start_dt = pd.to_datetime(entry_date)
-        end_dt = pd.to_datetime(exit_date)
+        end_dt = pd.to_datetime(exit_date) + timedelta(days=5)   # buffer for future Fridays
 
         backtest_df = backtest_df[
             (backtest_df['date'] >= start_dt) &
