@@ -67,7 +67,7 @@ with col_title:
     st.caption("Simulated weekly covered calls vs buy & hold — premiums are cash (not reinvested)")
     with st.expander("How the backtester works", expanded=False):
         st.markdown("""
-        • Every Monday open: sell ATM / slightly OTM covered call (strike rounded to your increment).  
+        • Every Monday open: sell ATM / slightly OTM covered call.  
         • Hold until Friday close (assign if ITM, else expires).  
         • If **Reopen after assignment** is enabled: rebuy the same number of shares next Monday —  
           **uses any available cash (premiums + assignment proceeds) first**, then injects extra capital only if needed.
@@ -256,6 +256,9 @@ strike_increment = st.selectbox(
     options=strike_increment_options,
     index=strike_increment_options.index(real_increment) if real_increment in strike_increment_options else 1,
     format_func=lambda x: f"${x:.2f}",
+    help="Detected value is only a suggestion from the nearest options chain and may be incorrect. "
+         "Always check your broker’s real chain and manually select the increment you want. "
+         "Backtester rounds Monday open UP to the next multiple of your choice (slightly OTM bias)."
 )
 
 # ── Fetch stock data ──────────────────────────────────────────────────────
