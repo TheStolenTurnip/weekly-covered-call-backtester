@@ -69,7 +69,7 @@ with col_title:
         st.markdown("""
         • Every Monday open: sell ATM / slightly OTM covered call (strike rounded to your increment).  
         • Hold until Friday close (assign if ITM, else expires).  
-        • If **Re-open after assignment** is enabled: rebuy the same number of shares next Monday —  
+        • If **Reopen after assignment** is enabled: rebuy the same number of shares next Monday —  
           **uses any available cash (premiums + assignment proceeds) first**, then injects extra capital only if needed.
         """)
     st.markdown("<br>", unsafe_allow_html=True)   # tiny breathing room so inputs don't feel stuck
@@ -311,7 +311,7 @@ with col_a:
     use_date_range = st.checkbox("Custom date range", value=True,
                                  help="Uncheck for full history")
 with col_b:
-    reopen_if_assigned = st.checkbox("Re-open after assignment", value=True,
+    reopen_if_assigned = st.checkbox("Reopen after assignment", value=True,
                                      help="Buy back the same number of shares next Monday (open) if assigned")
 
 entry_date = st.date_input(
@@ -622,7 +622,7 @@ if st.button("Run Weekly Backtest", type="primary"):
         st.metric(
             "Additional Capital Injected (Cumulative)",
             f"${cum_external_injected:,.2f}",
-            help="Additional capital that had to be added to repurchase shares after assignments (when re-opening is enabled)"
+            help="Additional capital that had to be added to repurchase shares after assignments (when reopening is enabled)"
         )
         st.metric(
             "Current Position",
@@ -992,7 +992,7 @@ if st.button("Run Weekly Backtest", type="primary"):
     st.info("""
     - **Buy & Hold NAV** is shares × current price
     - **Strategy NAV** is cash (premiums + assignment proceeds) + position value
-    - **Note**: Strategy NAV may be inflated if "Re-open after assignment" checkbox is checked (additional capital is injected to fulfill trades rather than Buy & Hold)
+    - **Note**: Strategy NAV may be inflated if "Reopen after assignment" checkbox is checked (additional capital is injected to fulfill trades rather than Buy & Hold)
     - Click + drag pans the chart; scroll wheel or box select to zoom
     - Hover shows exact $ values (rounded to 2 decimals)
     """)
