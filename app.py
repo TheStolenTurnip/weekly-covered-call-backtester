@@ -65,6 +65,13 @@ col_title, col_clock = st.columns([7, 1.5])
 with col_title:
     st.title("Weekly ATM / Slightly OTM Covered Calls Backtester")
     st.caption("Simulated weekly covered calls vs buy & hold — premiums are cash (not reinvested)")
+    st.markdown("""
+    <span style="font-size: 0.82rem; color: #888; line-height: 1.3;">
+    Every Monday open: sell ATM / slightly OTM covered call. Hold to Friday close (assign if ITM).  
+    Re-open after assignment (if enabled): rebuy same shares next Monday — uses cash/premiums first, then injects extra capital if needed.  
+    Premiums collected as cash (no reinvestment). Keeps writing covered calls while holding shares.
+    </span>
+    """, unsafe_allow_html=True)
 
 with col_clock:
     st.components.v1.html(
@@ -189,7 +196,7 @@ with col_clock:
 # ── Inputs ────────────────────────────────────────────────────────────────
 col1, col2, col3 = st.columns(3)
 with col1:
-    symbol = st.text_input("Ticker", value="SOFI").upper().strip()
+    symbol = st.text_input("Ticker", value="TSLA").upper().strip()
 
 real_increment = 0.50
 detected_message = ""
@@ -281,7 +288,7 @@ if symbol:
         full_df = df.copy()
 
 with col2:
-    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=55.0, step=5.0,
+    iv_percent = st.number_input("Assumed IV (%)", 10.0, 300.0, value=40.0, step=5.0,
                                  help="Implied volatility used to estimate call premiums (check your options chain)") / 100.0
 with col3:
     num_shares = st.number_input("Shares (by lot)", min_value=100, value=100, step=100,
