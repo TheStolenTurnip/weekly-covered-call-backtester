@@ -65,7 +65,7 @@ col_title, col_clock = st.columns([7, 1.5])
 with col_title:
     st.title("Weekly ATM / Slightly OTM Covered Calls Backtester")
     st.caption("Simulated weekly covered calls vs buy & hold — premiums are cash (not reinvested)")
-    with st.expander("How the backtester works", expanded=False):
+    with st.expander("How the backtester works:", expanded=False):
         st.markdown("""
         • Every Monday open: sell ATM / slightly OTM covered call.  
         • Hold until Friday close (assign if ITM, else expires).  
