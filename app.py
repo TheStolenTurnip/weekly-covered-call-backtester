@@ -65,13 +65,14 @@ col_title, col_clock = st.columns([7, 1.5])
 with col_title:
     st.title("Weekly ATM / Slightly OTM Covered Calls Backtester")
     st.caption("Simulated weekly covered calls vs buy & hold — premiums are cash (not reinvested)")
-    st.markdown("""
-    <span style="font-size: 0.82rem; color: #888; line-height: 1.3;">
-    Every Monday open: sell ATM / slightly OTM covered call. Hold to Friday close (assign if ITM).  
-    Re-open after assignment (if enabled): rebuy same shares next Monday — uses cash/premiums first, then injects extra capital if needed.  
-    Premiums collected as cash (no reinvestment). Keeps writing covered calls while holding shares.
-    </span>
-    """, unsafe_allow_html=True)
+    with st.expander("How the backtester works", expanded=False):
+        st.markdown("""
+        • Every Monday open: sell ATM / slightly OTM covered call (strike rounded to your increment).  
+        • Hold until Friday close (assign if ITM, else expires).  
+        • If **Re-open after assignment** is enabled: rebuy the same number of shares next Monday —  
+          **uses any available cash (premiums + assignment proceeds) first**, then injects extra capital only if needed.
+        """)
+    st.markdown("<br>", unsafe_allow_html=True)   # tiny breathing room so inputs don't feel stuck
 
 with col_clock:
     st.components.v1.html(
