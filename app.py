@@ -197,7 +197,7 @@ with col_clock:
 # ── Inputs ────────────────────────────────────────────────────────────────
 col1, col2, col3 = st.columns(3)
 with col1:
-    symbol = st.text_input("Ticker", value="TSLA").upper().strip()
+    symbol = st.text_input("Ticker", value="NVDA").upper().strip()
 
 real_increment = 0.50
 detected_message = ""
